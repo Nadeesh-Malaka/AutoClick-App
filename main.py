@@ -76,48 +76,97 @@ class AutoClickerApp:
     
     def setup_emergency_stops(self):
         """Setup multiple emergency stop mechanisms"""
-        # Bind keyboard shortcuts to main window
+        # Bind keyboard shortcuts to main window and all events
         self.root.bind_all('<Escape>', self.emergency_stop_handler)
         self.root.bind_all('<F12>', self.emergency_stop_handler)
         self.root.bind_all('<Control-c>', self.emergency_stop_handler)
         self.root.bind_all('<Control-q>', self.emergency_stop_handler)
+        self.root.bind_all('<Key-Escape>', self.emergency_stop_handler)
+        self.root.bind_all('<KeyPress-Escape>', self.emergency_stop_handler)
+        
+        # Also bind to the root window directly
+        self.root.bind('<Escape>', self.emergency_stop_handler)
+        self.root.bind('<F12>', self.emergency_stop_handler)
+        
+        # Ensure the window can receive keyboard events
+        self.root.focus_set()
+        
+        # Make sure keyboard focus is maintained
+        def maintain_focus():
+            if self.is_running:
+                try:
+                    self.root.focus_force()
+                except:
+                    pass
+            self.root.after(1000, maintain_focus)  # Check every second
+        
+        maintain_focus()
         
         # Enable pyautogui failsafe (move mouse to top-left corner)
         pyautogui.FAILSAFE = True
         
-        # Start emergency stop monitor thread
+        # Start emergency stop monitor thread with keyboard monitoring
         self.start_emergency_monitor()
         
         self.log_message("🛡️ Emergency stops active: ESC, F12, Ctrl+C, Ctrl+Q, or mouse to top-left corner")
     
     def emergency_stop_handler(self, event=None):
         """Handle emergency stop from keyboard"""
-        if self.is_running:
-            self.emergency_stop = True
-            self.is_running = False
-            self.root.after(0, self.force_stop_clicking)
-            self.log_message("🚨 EMERGENCY STOP activated!")
-            return "break"
+        self.trigger_emergency_stop()
+        return "break"
     
     def start_emergency_monitor(self):
         """Start monitoring for emergency conditions"""
         def monitor():
             while True:
                 try:
-                    # Check if mouse is in top-left corner (pyautogui failsafe)
                     if self.is_running:
+                        # Check mouse position for failsafe
                         mouse_x, mouse_y = pyautogui.position()
                         if mouse_x <= 5 and mouse_y <= 5:
-                            self.emergency_stop = True
-                            self.is_running = False
-                            self.root.after(0, self.force_stop_clicking)
+                            self.trigger_emergency_stop()
+                            
+                        # Check for keyboard state using Windows API if available
+                        try:
+                            import ctypes
+                            # Check ESC key (VK_ESCAPE = 0x1B)
+                            if ctypes.windll.user32.GetAsyncKeyState(0x1B) & 0x8000:
+                                self.trigger_emergency_stop()
+                            # Check F12 key (VK_F12 = 0x7B)  
+                            if ctypes.windll.user32.GetAsyncKeyState(0x7B) & 0x8000:
+                                self.trigger_emergency_stop()
+                            # Check Ctrl+C (Ctrl = 0x11, C = 0x43)
+                            if (ctypes.windll.user32.GetAsyncKeyState(0x11) & 0x8000) and (ctypes.windll.user32.GetAsyncKeyState(0x43) & 0x8000):
+                                self.trigger_emergency_stop()
+                        except:
+                            pass  # Fallback to other methods if ctypes not available
+                        
+                        # Check for emergency stop file
+                        if os.path.exists("EMERGENCY_STOP"):
+                            self.trigger_emergency_stop()
+                            try:
+                                os.remove("EMERGENCY_STOP")
+                            except:
+                                pass
                     
-                    time.sleep(0.1)  # Check every 100ms
+                    time.sleep(0.05)  # Check every 50ms for faster response
                 except:
                     break
         
         monitor_thread = threading.Thread(target=monitor, daemon=True)
         monitor_thread.start()
+    
+    def trigger_emergency_stop(self):
+        """Trigger emergency stop from any source"""
+        if self.is_running:
+            self.emergency_stop = True
+            self.is_running = False
+            self.log_message("🚨 EMERGENCY STOP ACTIVATED!")
+            try:
+                self.root.after(0, self.force_stop_clicking)
+            except:
+                # If we can't schedule in main thread, force stop immediately
+                self.force_stop_clicking()
     
     def force_stop_clicking(self):
         """Force stop all clicking operations immediately"""
@@ -340,14 +389,14 @@ class AutoClickerApp:
         
         # Emergency stop button (always visible)
         self.emergency_button = ttk.Button(button_frame, text="🚨 EMERGENCY", 
-                                          command=self.emergency_stop_handler,
+                                          command=self.trigger_emergency_stop,
                                           width=12)
         self.emergency_button.grid(row=0, column=2)
         self.emergency_button.configure(style="Danger.TButton")
         
         # Emergency instructions
         emergency_info = ttk.Label(control_frame, 
-                                 text="🛡️ Emergency Stops: ESC • F12 • Ctrl+C • Mouse to top-left corner", 
+                                 text="🛡️ Emergency Stops: ESC • F12 • Ctrl+C • Mouse to corner • EMERGENCY.bat", 
                                  font=('Segoe UI', 8), foreground=self.colors['secondary'])
         emergency_info.grid(row=1, column=0, pady=(5, 8))
         
