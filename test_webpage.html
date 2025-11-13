@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Clicker Test Page</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #4a5568;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .button-section {
+            text-align: center;
+            margin: 40px 0;
+        }
+
+        #clickButton {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            font-size: 1.5em;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(255, 107, 107, 0.4);
+            transition: all 0.3s ease;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #clickButton:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(255, 107, 107, 0.6);
+        }
+
+        #clickButton:active {
+            transform: translateY(0px);
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            background: #4a5568;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .control-btn:hover {
+            background: #2d3748;
+            transform: translateY(-2px);
+        }
+
+        .table-section {
+            margin-top: 30px;
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        th {
+            background: linear-gradient(135deg, #4a5568, #2d3748);
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        tr:hover {
+            background-color: #e2e8f0;
+            transform: scale(1.01);
+            transition: all 0.2s ease;
+        }
+
+        .click-animation {
+            position: fixed;
+            pointer-events: none;
+            color: #ff6b6b;
+            font-weight: bold;
+            font-size: 1.2em;
+            z-index: 1000;
+            animation: clickPop 1s ease-out forwards;
+        }
+
+        @keyframes clickPop {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(1.5) translateY(-30px);
+            }
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e2e8f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .coordinates {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+            font-family: monospace;
+        }
+
+        .blink {
+            animation: blink 0.5s ease-in-out;
+        }
+
+        @keyframes blink {
+            0%, 100% { background-color: transparent; }
+            50% { background-color: rgba(255, 107, 107, 0.3); }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Auto Clicker Test Page</h1>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="totalClicks">0</div>
+                <div class="stat-label">Total Clicks</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="clicksPerSecond">0.0</div>
+                <div class="stat-label">Clicks/Second</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="sessionTime">00:00</div>
+                <div class="stat-label">Session Time</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="lastClickTime">Never</div>
+                <div class="stat-label">Last Click</div>
+            </div>
+        </div>
+
+        <div class="coordinates">
+            <strong>Button Coordinates:</strong> 
+            X: <span id="buttonX">0</span>, Y: <span id="buttonY">0</span>
+            <br>
+            <strong>Mouse Position:</strong> 
+            X: <span id="mouseX">0</span>, Y: <span id="mouseY">0</span>
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+        </div>
+
+        <div class="button-section">
+            <button id="clickButton">🎯 CLICK ME!</button>
+        </div>
+
+        <div class="controls">
+            <button class="control-btn" onclick="resetStats()">🔄 Reset</button>
+            <button class="control-btn" onclick="exportData()">📊 Export Data</button>
+            <button class="control-btn" onclick="toggleSound()">🔊 Sound: <span id="soundStatus">ON</span></button>
+            <button class="control-btn" onclick="changeTarget()">🎯 Change Target</button>
+        </div>
+
+        <div class="table-section">
+            <div class="table-header">
+                <h2>Click History (Live Updates)</h2>
+                <span>Updates every second • Last 20 clicks</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Time</th>
+                        <th>Coordinates</th>
+                        <th>Interval (ms)</th>
+                        <th>Speed (clicks/sec)</th>
+                    </tr>
+                </thead>
+                <tbody id="clickTable">
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: #666; font-style: italic;">
+                            No clicks yet. Start clicking to see data!
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Click tracking variables
+        let totalClicks = 0;
+        let clickHistory = [];
+        let sessionStart = Date.now();
+        let lastClickTime = null;
+        let soundEnabled = true;
+
+        // Get button element and coordinates
+        const button = document.getElementById('clickButton');
+        const tableBody = document.getElementById('clickTable');
+
+        // Update button coordinates on page load and resize
+        function updateButtonCoordinates() {
+            const rect = button.getBoundingClientRect();
+            const x = Math.round(rect.left + rect.width / 2 + window.scrollX);
+            const y = Math.round(rect.top + rect.height / 2 + window.scrollY);
+            
+            document.getElementById('buttonX').textContent = x;
+            document.getElementById('buttonY').textContent = y;
+        }
+
+        // Track mouse position
+        document.addEventListener('mousemove', function(e) {
+            document.getElementById('mouseX').textContent = e.clientX + window.scrollX;
+            document.getElementById('mouseY').textContent = e.clientY + window.scrollY;
+        });
+
+        // Button click handler
+        button.addEventListener('click', function(e) {
+            handleClick(e);
+        });
+
+        function handleClick(e) {
+            totalClicks++;
+            const now = Date.now();
+            const coords = {
+                x: e.clientX + window.scrollX,
+                y: e.clientY + window.scrollY
+            };
+
+            // Calculate interval
+            let interval = lastClickTime ? now - lastClickTime : 0;
+            lastClickTime = now;
+
+            // Add to history
+            clickHistory.push({
+                id: totalClicks,
+                time: new Date(now),
+                coords: coords,
+                interval: interval
+            });
+
+            // Keep only last 20 clicks
+            if (clickHistory.length > 20) {
+                clickHistory.shift();
+            }
+
+            // Update UI
+            updateStats();
+            updateTable();
+            createClickAnimation(e.clientX, e.clientY);
+            
+            // Add blink effect to button
+            button.classList.add('blink');
+            setTimeout(() => button.classList.remove('blink'), 500);
+
+            // Play sound if enabled
+            if (soundEnabled) {
+                playClickSound();
+            }
+
+            // Update progress bar (example: progress to 100 clicks)
+            const progress = Math.min((totalClicks / 100) * 100, 100);
+            document.getElementById('progressFill').style.width = progress + '%';
+        }
+
+        function updateStats() {
+            // Total clicks
+            document.getElementById('totalClicks').textContent = totalClicks;
+
+            // Clicks per second (based on last 10 clicks)
+            const recentClicks = clickHistory.slice(-10);
+            if (recentClicks.length > 1) {
+                const timeSpan = recentClicks[recentClicks.length - 1].time - recentClicks[0].time;
+                const cps = timeSpan > 0 ? ((recentClicks.length - 1) / (timeSpan / 1000)).toFixed(1) : '0.0';
+                document.getElementById('clicksPerSecond').textContent = cps;
+            }
+
+            // Session time
+            const sessionDuration = Date.now() - sessionStart;
+            const minutes = Math.floor(sessionDuration / 60000);
+            const seconds = Math.floor((sessionDuration % 60000) / 1000);
+            document.getElementById('sessionTime').textContent = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+            // Last click time
+            if (lastClickTime) {
+                document.getElementById('lastClickTime').textContent = 
+                    new Date(lastClickTime).toLocaleTimeString();
+            }
+        }
+
+        function updateTable() {
+            // Clear existing rows
+            tableBody.innerHTML = '';
+
+            // Add click history (newest first)
+            const reversedHistory = [...clickHistory].reverse();
+            
+            reversedHistory.forEach((click, index) => {
+                const row = tableBody.insertRow();
+                
+                // Click number
+                const cellNum = row.insertCell(0);
+                cellNum.textContent = click.id;
+                
+                // Time
+                const cellTime = row.insertCell(1);
+                cellTime.textContent = click.time.toLocaleTimeString();
+                
+                // Coordinates
+                const cellCoords = row.insertCell(2);
+                cellCoords.textContent = `${click.coords.x}, ${click.coords.y}`;
+                
+                // Interval
+                const cellInterval = row.insertCell(3);
+                cellInterval.textContent = click.interval > 0 ? click.interval : 'First';
+                
+                // Speed
+                const cellSpeed = row.insertCell(4);
+                if (click.interval > 0) {
+                    const speed = (1000 / click.interval).toFixed(2);
+                    cellSpeed.textContent = speed;
+                } else {
+                    cellSpeed.textContent = '-';
+                }
+
+                // Highlight newest row
+                if (index === 0) {
+                    row.style.backgroundColor = 'rgba(255, 107, 107, 0.1)';
+                    setTimeout(() => {
+                        row.style.backgroundColor = '';
+                    }, 1000);
+                }
+            });
+
+            // If no clicks, show placeholder
+            if (clickHistory.length === 0) {
+                const row = tableBody.insertRow();
+                const cell = row.insertCell(0);
+                cell.colSpan = 5;
+                cell.style.textAlign = 'center';
+                cell.style.color = '#666';
+                cell.style.fontStyle = 'italic';
+                cell.textContent = 'No clicks yet. Start clicking to see data!';
+            }
+        }
+
+        function createClickAnimation(x, y) {
+            const animation = document.createElement('div');
+            animation.className = 'click-animation';
+            animation.textContent = '+1';
+            animation.style.left = x + 'px';
+            animation.style.top = y + 'px';
+            
+            document.body.appendChild(animation);
+            
+            setTimeout(() => {
+                document.body.removeChild(animation);
+            }, 1000);
+        }
+
+        function playClickSound() {
+            // Create audio context for click sound
+            if (typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined') {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = 800;
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.1);
+            }
+        }
+
+        // Control functions
+        function resetStats() {
+            if (confirm('Are you sure you want to reset all statistics?')) {
+                totalClicks = 0;
+                clickHistory = [];
+                sessionStart = Date.now();
+                lastClickTime = null;
+                
+                updateStats();
+                updateTable();
+                document.getElementById('progressFill').style.width = '0%';
+            }
+        }
+
+        function exportData() {
+            const data = {
+                totalClicks: totalClicks,
+                sessionStart: new Date(sessionStart),
+                clickHistory: clickHistory
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `click-data-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('soundStatus').textContent = soundEnabled ? 'ON' : 'OFF';
+        }
+
+        function changeTarget() {
+            const colors = [
+                'linear-gradient(135deg, #ff6b6b, #ee5a24)',
+                'linear-gradient(135deg, #4ecdc4, #44a08d)',
+                'linear-gradient(135deg, #45b7d1, #96c93d)',
+                'linear-gradient(135deg, #f093fb, #f5576c)',
+                'linear-gradient(135deg, #4facfe, #00f2fe)'
+            ];
+            
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+            button.style.background = randomColor;
+        }
+
+        // Initialize
+        window.addEventListener('load', function() {
+            updateButtonCoordinates();
+            updateStats();
+        });
+
+        window.addEventListener('resize', updateButtonCoordinates);
+
+        // Update stats every second
+        setInterval(updateStats, 1000);
+
+        // Auto-update table every second when there are clicks
+        setInterval(() => {
+            if (clickHistory.length > 0) {
+                // Just refresh the display, don't add new data
+                const lastRow = tableBody.rows[0];
+                if (lastRow && lastRow.cells.length > 1) {
+                    // Update the time display for real-time feel
+                    updateStats();
+                }
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
