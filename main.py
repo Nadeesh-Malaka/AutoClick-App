@@ -25,6 +25,10 @@ class AutoClickerApp:
         self.click_thread = None
         self.scheduled_time = None
         self.settings_file = "autoclicker_settings.json"
+        self.emergency_stop = False
+        
+        # Setup emergency stop mechanisms
+        self.setup_emergency_stops()
         
         # Setup logging
         self.setup_logging()
@@ -69,6 +73,67 @@ class AutoClickerApp:
             datefmt='%Y-%m-%d %H:%M:%S'
         )
         self.logger = logging.getLogger(__name__)
+    
+    def setup_emergency_stops(self):
+        """Setup multiple emergency stop mechanisms"""
+        # Bind keyboard shortcuts to main window
+        self.root.bind_all('<Escape>', self.emergency_stop_handler)
+        self.root.bind_all('<F12>', self.emergency_stop_handler)
+        self.root.bind_all('<Control-c>', self.emergency_stop_handler)
+        self.root.bind_all('<Control-q>', self.emergency_stop_handler)
+        
+        # Enable pyautogui failsafe (move mouse to top-left corner)
+        pyautogui.FAILSAFE = True
+        
+        # Start emergency stop monitor thread
+        self.start_emergency_monitor()
+        
+        self.log_message("🛡️ Emergency stops active: ESC, F12, Ctrl+C, Ctrl+Q, or mouse to top-left corner")
+    
+    def emergency_stop_handler(self, event=None):
+        """Handle emergency stop from keyboard"""
+        if self.is_running:
+            self.emergency_stop = True
+            self.is_running = False
+            self.root.after(0, self.force_stop_clicking)
+            self.log_message("🚨 EMERGENCY STOP activated!")
+            return "break"
+    
+    def start_emergency_monitor(self):
+        """Start monitoring for emergency conditions"""
+        def monitor():
+            while True:
+                try:
+                    # Check if mouse is in top-left corner (pyautogui failsafe)
+                    if self.is_running:
+                        mouse_x, mouse_y = pyautogui.position()
+                        if mouse_x <= 5 and mouse_y <= 5:
+                            self.emergency_stop = True
+                            self.is_running = False
+                            self.root.after(0, self.force_stop_clicking)
+                    
+                    time.sleep(0.1)  # Check every 100ms
+                except:
+                    break
+        
+        monitor_thread = threading.Thread(target=monitor, daemon=True)
+        monitor_thread.start()
+    
+    def force_stop_clicking(self):
+        """Force stop all clicking operations immediately"""
+        self.emergency_stop = True
+        self.is_running = False
+        
+        # Update UI immediately
+        self.start_button.config(state="normal")
+        self.stop_button.config(state="disabled")
+        self.update_status("🚨 EMERGENCY STOPPED", "danger")
+        
+        # Show emergency notification
+        self.show_notification("Emergency Stop", "Auto clicker stopped immediately!")
+        
+        # Log the emergency stop
+        self.log_message("🚨 Emergency stop executed - All clicking stopped immediately")
     
     def create_gui(self):
         """Create the main GUI interface"""
@@ -213,7 +278,7 @@ class AutoClickerApp:
         
         # Settings grid - compact
         ttk.Label(settings_frame, text="Count:", font=('Segoe UI', 8)).grid(row=1, column=0, sticky=tk.W, pady=2)
-        self.click_count_var = tk.StringVar(value="10")
+        self.click_count_var = tk.StringVar(value="100")
         ttk.Entry(settings_frame, textvariable=self.click_count_var, width=8, font=('Segoe UI', 8)).grid(row=1, column=1, sticky=tk.W, padx=(5, 0), pady=2)
         
         ttk.Label(settings_frame, text="Interval (s):", font=('Segoe UI', 8)).grid(row=2, column=0, sticky=tk.W, pady=2)
@@ -266,16 +331,29 @@ class AutoClickerApp:
         
         self.start_button = ttk.Button(button_frame, text="🚀 Start Clicking", 
                                       command=self.start_clicking, style="Primary.TButton", width=15)
-        self.start_button.grid(row=0, column=0, padx=(0, 8))
+        self.start_button.grid(row=0, column=0, padx=(0, 5))
         
         self.stop_button = ttk.Button(button_frame, text="⏹ Stop", 
                                      command=self.stop_clicking, state="disabled", 
                                      style="Danger.TButton", width=10)
-        self.stop_button.grid(row=0, column=1, padx=(0, 8))
+        self.stop_button.grid(row=0, column=1, padx=(0, 5))
+        
+        # Emergency stop button (always visible)
+        self.emergency_button = ttk.Button(button_frame, text="🚨 EMERGENCY", 
+                                          command=self.emergency_stop_handler,
+                                          width=12)
+        self.emergency_button.grid(row=0, column=2)
+        self.emergency_button.configure(style="Danger.TButton")
+        
+        # Emergency instructions
+        emergency_info = ttk.Label(control_frame, 
+                                 text="🛡️ Emergency Stops: ESC • F12 • Ctrl+C • Mouse to top-left corner", 
+                                 font=('Segoe UI', 8), foreground=self.colors['secondary'])
+        emergency_info.grid(row=1, column=0, pady=(5, 8))
         
         # Settings management
         settings_button_frame = ttk.Frame(control_frame)
-        settings_button_frame.grid(row=1, column=0)
+        settings_button_frame.grid(row=2, column=0)
         
         ttk.Button(settings_button_frame, text="💾", 
                   command=self.save_settings, width=4).grid(row=0, column=0, padx=(0, 3))
@@ -324,23 +402,216 @@ class AutoClickerApp:
         self.root.after(1000, self.update_current_time)
     
     def add_click_point(self):
-        """Add a click point by clicking on the screen"""
-        self.root.withdraw()  # Hide the window
-        self.log_message("Click on the desired location on screen...")
+        """Add a click point with visual confirmation"""
+        self.show_point_selector()
+    
+    def show_point_selector(self):
+        """Show point selection window with visual feedback"""
+        # Create fullscreen overlay window
+        overlay = tk.Toplevel(self.root)
+        overlay.title("Select Click Point")
+        overlay.attributes('-fullscreen', True)
+        overlay.attributes('-alpha', 0.3)  # Semi-transparent
+        overlay.configure(bg='red')
+        overlay.attributes('-topmost', True)
         
-        # Give user time to position
-        time.sleep(2)
+        # Create crosshair cursor
+        overlay.config(cursor='crosshair')
         
-        try:
-            # Get mouse position
-            x, y = pyautogui.position()
+        # Instructions label
+        instruction_label = tk.Label(
+            overlay, 
+            text="🎯 CLICK ANYWHERE TO SET POINT\n\n• Click to select location\n• Press ESC to cancel\n• Move mouse to see coordinates",
+            font=('Segoe UI', 16, 'bold'),
+            bg='black',
+            fg='white',
+            padx=20,
+            pady=15
+        )
+        instruction_label.place(relx=0.5, rely=0.1, anchor='center')
+        
+        # Coordinate display
+        coord_label = tk.Label(
+            overlay,
+            text="Position: (0, 0)",
+            font=('Consolas', 14, 'bold'),
+            bg='black',
+            fg='yellow',
+            padx=10,
+            pady=5
+        )
+        coord_label.place(relx=0.5, rely=0.2, anchor='center')
+        
+        def update_coordinates(event):
+            coord_label.config(text=f"Position: ({event.x_root}, {event.y_root})")
+        
+        def on_click(event):
+            # Get actual screen coordinates
+            x, y = event.x_root, event.y_root
+            overlay.destroy()
+            
+            # Show confirmation dialog
+            self.confirm_click_point(x, y)
+        
+        def on_escape(event):
+            overlay.destroy()
+            self.log_message("Point selection cancelled")
+        
+        # Bind events
+        overlay.bind('<Button-1>', on_click)
+        overlay.bind('<Motion>', update_coordinates)
+        overlay.bind('<Escape>', on_escape)
+        overlay.bind('<KeyPress-Escape>', on_escape)
+        
+        # Focus the overlay
+        overlay.focus_set()
+        overlay.grab_set()
+        
+        self.log_message("Point selection mode active - Click anywhere to set point")
+    
+    def confirm_click_point(self, x, y):
+        """Show confirmation dialog with point preview"""
+        # Create confirmation window
+        confirm_window = tk.Toplevel(self.root)
+        confirm_window.title("Confirm Click Point")
+        confirm_window.geometry("400x300")
+        confirm_window.resizable(False, False)
+        confirm_window.configure(bg='#f8fafc')
+        confirm_window.attributes('-topmost', True)
+        
+        # Center the window
+        confirm_window.update_idletasks()
+        x_pos = (confirm_window.winfo_screenwidth() // 2) - 200
+        y_pos = (confirm_window.winfo_screenheight() // 2) - 150
+        confirm_window.geometry(f"400x300+{x_pos}+{y_pos}")
+        
+        # Title
+        title_label = tk.Label(
+            confirm_window,
+            text="🎯 Confirm Click Point",
+            font=('Segoe UI', 14, 'bold'),
+            bg='#f8fafc',
+            fg='#1e293b'
+        )
+        title_label.pack(pady=15)
+        
+        # Coordinates display
+        coord_frame = tk.Frame(confirm_window, bg='#f8fafc')
+        coord_frame.pack(pady=10)
+        
+        tk.Label(
+            coord_frame,
+            text="Selected Position:",
+            font=('Segoe UI', 10, 'bold'),
+            bg='#f8fafc'
+        ).pack()
+        
+        tk.Label(
+            coord_frame,
+            text=f"X: {x}, Y: {y}",
+            font=('Consolas', 12, 'bold'),
+            bg='#e2e8f0',
+            fg='#2563eb',
+            padx=10,
+            pady=5
+        ).pack(pady=5)
+        
+        # Preview button
+        preview_btn = tk.Button(
+            confirm_window,
+            text="🔍 Preview Click Location",
+            font=('Segoe UI', 10),
+            bg='#64748b',
+            fg='white',
+            padx=20,
+            pady=5,
+            command=lambda: self.preview_click_location(x, y)
+        )
+        preview_btn.pack(pady=10)
+        
+        # Buttons frame
+        button_frame = tk.Frame(confirm_window, bg='#f8fafc')
+        button_frame.pack(pady=20)
+        
+        def confirm_add():
             self.click_points.append((x, y))
             self.update_points_listbox()
-            self.log_message(f"Added click point: ({x}, {y})")
-        except Exception as e:
-            self.log_message(f"Error adding click point: {str(e)}")
-        finally:
-            self.root.deiconify()  # Show the window again
+            self.log_message(f"✅ Added click point: ({x}, {y})")
+            confirm_window.destroy()
+        
+        def cancel_add():
+            confirm_window.destroy()
+            self.log_message("❌ Click point cancelled")
+        
+        # Confirm button
+        confirm_btn = tk.Button(
+            button_frame,
+            text="✅ Add This Point",
+            font=('Segoe UI', 10, 'bold'),
+            bg='#10b981',
+            fg='white',
+            padx=20,
+            pady=8,
+            command=confirm_add
+        )
+        confirm_btn.pack(side=tk.LEFT, padx=5)
+        
+        # Cancel button
+        cancel_btn = tk.Button(
+            button_frame,
+            text="❌ Cancel",
+            font=('Segoe UI', 10),
+            bg='#ef4444',
+            fg='white',
+            padx=20,
+            pady=8,
+            command=cancel_add
+        )
+        cancel_btn.pack(side=tk.LEFT, padx=5)
+        
+        # Instructions
+        instructions = tk.Label(
+            confirm_window,
+            text="Use 'Preview' to see a marker at the click location\nbefore confirming the point.",
+            font=('Segoe UI', 8),
+            bg='#f8fafc',
+            fg='#64748b'
+        )
+        instructions.pack(pady=10)
+        
+        # Focus and grab
+        confirm_window.focus_set()
+        confirm_window.grab_set()
+    
+    def preview_click_location(self, x, y):
+        """Show a temporary marker at the click location"""
+        # Create a small marker window
+        marker = tk.Toplevel()
+        marker.title("Click Point Preview")
+        marker.geometry("60x60")
+        marker.configure(bg='red')
+        marker.overrideredirect(True)  # Remove window decorations
+        marker.attributes('-topmost', True)
+        
+        # Position marker at click location
+        marker.geometry(f"60x60+{x-30}+{y-30}")
+        
+        # Create crosshair marker
+        canvas = tk.Canvas(marker, width=60, height=60, bg='red', highlightthickness=0)
+        canvas.pack()
+        
+        # Draw crosshair
+        canvas.create_line(0, 30, 60, 30, fill='white', width=3)  # Horizontal
+        canvas.create_line(30, 0, 30, 60, fill='white', width=3)  # Vertical
+        canvas.create_oval(25, 25, 35, 35, outline='white', width=3)  # Center circle
+        
+        # Add text
+        canvas.create_text(30, 45, text="CLICK", fill='white', font=('Arial', 8, 'bold'))
+        
+        # Auto-destroy after 3 seconds
+        marker.after(3000, marker.destroy)
+        
+        self.log_message(f"🎯 Preview marker shown at ({x}, {y})")
     
     def add_manual_point(self):
         """Add a click point manually from coordinates"""
@@ -409,6 +680,7 @@ class AutoClickerApp:
             return
         
         self.is_running = True
+        self.emergency_stop = False  # Reset emergency stop flag
         self.start_button.config(state="disabled")
         self.stop_button.config(state="normal")
         
@@ -448,10 +720,11 @@ class AutoClickerApp:
     def stop_clicking(self):
         """Stop the clicking process"""
         self.is_running = False
+        self.emergency_stop = True  # Set emergency flag for immediate stop
         self.start_button.config(state="normal")
         self.stop_button.config(state="disabled")
         self.update_status("Stopped", "danger")
-        self.log_message("Clicking stopped by user")
+        self.log_message("⏹ Clicking stopped by user")
     
     def update_status(self, message, status_type="success"):
         """Update status indicator and message"""
@@ -480,7 +753,7 @@ class AutoClickerApp:
             time.sleep(0.1)  # Check every 100ms for precision
     
     def click_worker(self):
-        """Worker thread for clicking"""
+        """Worker thread for clicking with emergency stop checks"""
         try:
             click_count = 0
             max_clicks = None
@@ -492,18 +765,32 @@ class AutoClickerApp:
             point_delay = float(self.point_delay_var.get())
             
             self.log_message(f"Starting clicks - Mode: {self.click_mode.get()}, "
+                           f"Count: {self.click_count_var.get()}, Max: {max_clicks}, "
                            f"Interval: {interval}s, Points: {len(self.click_points)}")
             
-            while self.is_running:
-                if max_clicks and click_count >= max_clicks:
+            while self.is_running and not self.emergency_stop:
+                # Check emergency stop before each cycle
+                if self.emergency_stop or not self.is_running:
+                    self.log_message(f"Stopping due to emergency_stop: {self.emergency_stop}, is_running: {self.is_running}")
                     break
+                    
+                if max_clicks and click_count >= max_clicks:
+                    self.log_message(f"Stopping due to max_clicks reached: {click_count} >= {max_clicks}")
+                    break
+                
+                self.log_message(f"Starting click cycle {click_count + 1}, max_clicks: {max_clicks}")
                 
                 # Click each point
                 for point_index, (x, y) in enumerate(self.click_points):
-                    if not self.is_running:
+                    # Multiple emergency stop checks
+                    if self.emergency_stop or not self.is_running:
                         break
                     
                     try:
+                        # Check emergency stop right before clicking
+                        if self.emergency_stop or not self.is_running:
+                            break
+                            
                         pyautogui.click(x, y)
                         click_count += 1
                         self.log_message(f"Clicked point {point_index + 1}: ({x}, {y}) - Total clicks: {click_count}")
@@ -511,23 +798,47 @@ class AutoClickerApp:
                         if max_clicks and click_count >= max_clicks:
                             break
                         
-                        # Delay between points
+                        # Emergency stop check during delay
                         if point_delay > 0 and point_index < len(self.click_points) - 1:
-                            time.sleep(point_delay)
+                            # Split delay into smaller chunks for faster emergency response
+                            delay_chunks = max(1, int(point_delay * 10))  # 0.1s chunks
+                            for _ in range(delay_chunks):
+                                if self.emergency_stop or not self.is_running:
+                                    break
+                                time.sleep(point_delay / delay_chunks)
                             
+                    except pyautogui.FailSafeException:
+                        self.emergency_stop = True
+                        self.log_message("🚨 PyAutoGUI Failsafe triggered - mouse moved to corner!")
+                        break
                     except Exception as e:
                         self.log_message(f"Error clicking point ({x}, {y}): {str(e)}")
                 
                 if max_clicks and click_count >= max_clicks:
+                    self.log_message(f"Reached max clicks after point loop: {click_count} >= {max_clicks}")
                     break
                 
-                # Delay between click cycles
-                if self.is_running and interval > 0:
-                    time.sleep(interval)
+                self.log_message(f"Completed click cycle, total clicks: {click_count}, waiting for interval: {interval}s")
+                
+                # Emergency stop check during main interval
+                if self.is_running and not self.emergency_stop and interval > 0:
+                    # Split interval into smaller chunks for faster emergency response
+                    interval_chunks = max(1, int(interval * 10))  # 0.1s chunks
+                    for _ in range(interval_chunks):
+                        if self.emergency_stop or not self.is_running:
+                            break
+                        time.sleep(interval / interval_chunks)
             
-            # Finished
-            self.root.after(0, self.clicking_finished, click_count)
+            # Finished (either completed or emergency stopped)
+            if self.emergency_stop:
+                self.root.after(0, self.force_stop_clicking)
+            else:
+                self.root.after(0, self.clicking_finished, click_count)
             
+        except pyautogui.FailSafeException:
+            self.emergency_stop = True
+            self.log_message("🚨 PyAutoGUI Failsafe triggered!")
+            self.root.after(0, self.force_stop_clicking)
         except Exception as e:
             self.log_message(f"Error in click worker: {str(e)}")
             self.root.after(0, self.clicking_finished, 0)
@@ -558,12 +869,19 @@ class AutoClickerApp:
         timestamp = datetime.now().strftime("%H:%M:%S")
         log_entry = f"[{timestamp}] {message}\n"
         
-        # Add to GUI log
-        self.log_text.insert(tk.END, log_entry)
-        self.log_text.see(tk.END)
+        # Add to GUI log (if GUI is created)
+        try:
+            if hasattr(self, 'log_text') and self.log_text:
+                self.log_text.insert(tk.END, log_entry)
+                self.log_text.see(tk.END)
+        except:
+            pass  # GUI not ready yet
         
         # Add to file log
-        self.logger.info(message)
+        try:
+            self.logger.info(message)
+        except:
+            pass  # Logger not ready yet
     
     def clear_log(self):
         """Clear the log display"""
@@ -620,7 +938,7 @@ class AutoClickerApp:
         if messagebox.askyesno("Confirm Reset", "Are you sure you want to reset all settings?"):
             self.click_points.clear()
             self.click_mode.set("unlimited")
-            self.click_count_var.set("1")
+            self.click_count_var.set("100")
             self.interval_var.set("1.0")
             self.point_delay_var.set("0.1")
             self.schedule_mode.set("immediate")
