@@ -12,9 +12,12 @@ from plyer import notification
 class AutoClickerApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Advanced Auto Clicker")
-        self.root.geometry("600x800")
+        self.root.title("🎯 Auto Clicker Pro")
+        self.root.geometry("500x700")
         self.root.resizable(True, True)
+        
+        # Configure modern style
+        self.setup_modern_style()
         
         # Initialize variables
         self.click_points = []
@@ -35,6 +38,28 @@ class AutoClickerApp:
         # Load settings if they exist
         self.load_settings()
     
+    def setup_modern_style(self):
+        """Configure modern UI styling"""
+        style = ttk.Style()
+        
+        # Configure modern colors
+        self.colors = {
+            'primary': '#2563eb',      # Blue
+            'secondary': '#64748b',    # Gray
+            'success': '#10b981',      # Green
+            'warning': '#f59e0b',      # Orange
+            'danger': '#ef4444',       # Red
+            'light': '#f8fafc',        # Light gray
+            'dark': '#1e293b'          # Dark gray
+        }
+        
+        # Configure styles
+        style.configure('Title.TLabel', font=('Segoe UI', 14, 'bold'), foreground=self.colors['dark'])
+        style.configure('Section.TLabelframe.Label', font=('Segoe UI', 10, 'bold'))
+        style.configure('Primary.TButton', font=('Segoe UI', 9, 'bold'))
+        style.configure('Success.TButton', font=('Segoe UI', 9))
+        style.configure('Danger.TButton', font=('Segoe UI', 9))
+    
     def setup_logging(self):
         """Setup logging for action tracking"""
         logging.basicConfig(
@@ -47,209 +72,255 @@ class AutoClickerApp:
     
     def create_gui(self):
         """Create the main GUI interface"""
-        # Main frame
-        main_frame = ttk.Frame(self.root, padding="10")
+        # Configure root window
+        self.root.configure(bg='#f8fafc')
+        
+        # Main scrollable frame
+        canvas = tk.Canvas(self.root, bg='#f8fafc', highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.root, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Main frame with modern padding
+        main_frame = ttk.Frame(scrollable_frame, padding="15")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # Configure grid weights
+        canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
-        main_frame.columnconfigure(1, weight=1)
+        main_frame.columnconfigure(0, weight=1)
         
-        # Title
-        title_label = ttk.Label(main_frame, text="Advanced Auto Clicker", 
-                               font=("Arial", 16, "bold"))
-        title_label.grid(row=0, column=0, columnspan=2, pady=(0, 20))
+        # Modern header with status
+        self.create_header(main_frame, 0)
         
-        # Click Points Section
+        # Create main sections in a compact layout
         self.create_click_points_section(main_frame, 1)
+        self.create_settings_and_schedule_section(main_frame, 2)  # Combined section
+        self.create_control_section(main_frame, 3)
+        self.create_log_section(main_frame, 4)
         
-        # Click Settings Section
-        self.create_click_settings_section(main_frame, 2)
+        # Enable mouse wheel scrolling
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+    
+    def create_header(self, parent, row):
+        """Create modern header with title and status"""
+        header_frame = ttk.Frame(parent)
+        header_frame.grid(row=row, column=0, sticky=(tk.W, tk.E), pady=(0, 15))
+        header_frame.columnconfigure(1, weight=1)
         
-        # Schedule Section
-        self.create_schedule_section(main_frame, 3)
+        # App title with icon
+        title_label = ttk.Label(header_frame, text="🎯 Auto Clicker Pro", style="Title.TLabel")
+        title_label.grid(row=0, column=0, sticky=tk.W)
         
-        # Control Buttons Section
-        self.create_control_buttons_section(main_frame, 4)
+        # Status indicator
+        self.status_frame = ttk.Frame(header_frame)
+        self.status_frame.grid(row=0, column=1, sticky=tk.E)
         
-        # Settings Section
-        self.create_settings_section(main_frame, 5)
+        self.status_indicator = tk.Label(self.status_frame, text="●", fg=self.colors['success'], 
+                                       font=('Segoe UI', 12), bg='#f8fafc')
+        self.status_indicator.grid(row=0, column=0, padx=(0, 5))
         
-        # Log Section
-        self.create_log_section(main_frame, 6)
+        self.status_label = ttk.Label(self.status_frame, text="Ready", foreground=self.colors['success'])
+        self.status_label.grid(row=0, column=1)
+        
+        # Current time
+        self.current_time_label = ttk.Label(header_frame, text="", 
+                                          font=('Segoe UI', 8), foreground=self.colors['secondary'])
+        self.current_time_label.grid(row=1, column=0, columnspan=2, pady=(5, 0))
+        self.update_current_time()
     
     def create_click_points_section(self, parent, row):
-        """Create the click points configuration section"""
-        # Click Points Frame
-        points_frame = ttk.LabelFrame(parent, text="Click Points", padding="10")
-        points_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
-        points_frame.columnconfigure(1, weight=1)
+        """Create compact click points section"""
+        points_frame = ttk.LabelFrame(parent, text="📍 Click Points", padding="8", style="Section.TLabelframe")
+        points_frame.grid(row=row, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        points_frame.columnconfigure(0, weight=1)
+        
+        # Top controls - horizontal layout
+        controls_frame = ttk.Frame(points_frame)
+        controls_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 8))
+        controls_frame.columnconfigure(2, weight=1)
         
         # Add point button
-        ttk.Button(points_frame, text="Add Click Point", 
-                  command=self.add_click_point).grid(row=0, column=0, padx=(0, 10))
+        ttk.Button(controls_frame, text="+ Add Point", 
+                  command=self.add_click_point, style="Primary.TButton").grid(row=0, column=0, padx=(0, 8))
         
-        # Manual coordinate entry
-        ttk.Label(points_frame, text="Manual Entry (X,Y):").grid(row=0, column=1, sticky=tk.W)
+        # Manual entry - compact
+        coord_frame = ttk.Frame(controls_frame)
+        coord_frame.grid(row=0, column=1, padx=(0, 8))
         
-        coord_frame = ttk.Frame(points_frame)
-        coord_frame.grid(row=0, column=2, padx=10)
+        self.x_entry = ttk.Entry(coord_frame, width=6, font=('Segoe UI', 8))
+        self.x_entry.grid(row=0, column=0, padx=(0, 2))
         
-        self.x_entry = ttk.Entry(coord_frame, width=8)
-        self.x_entry.grid(row=0, column=0, padx=2)
+        ttk.Label(coord_frame, text="×", font=('Segoe UI', 8)).grid(row=0, column=1, padx=2)
         
-        ttk.Label(coord_frame, text=",").grid(row=0, column=1)
-        
-        self.y_entry = ttk.Entry(coord_frame, width=8)
-        self.y_entry.grid(row=0, column=2, padx=2)
+        self.y_entry = ttk.Entry(coord_frame, width=6, font=('Segoe UI', 8))
+        self.y_entry.grid(row=0, column=2, padx=(2, 0))
         
         ttk.Button(coord_frame, text="Add", 
-                  command=self.add_manual_point).grid(row=0, column=3, padx=(5, 0))
+                  command=self.add_manual_point, width=6).grid(row=0, column=3, padx=(5, 0))
         
-        # Points listbox with scrollbar
-        list_frame = ttk.Frame(points_frame)
-        list_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=10)
-        list_frame.columnconfigure(0, weight=1)
+        # Action buttons
+        action_frame = ttk.Frame(controls_frame)
+        action_frame.grid(row=0, column=2, sticky=tk.E)
         
-        self.points_listbox = tk.Listbox(list_frame, height=6)
-        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=self.points_listbox.yview)
-        self.points_listbox.configure(yscrollcommand=scrollbar.set)
+        ttk.Button(action_frame, text="Remove", 
+                  command=self.remove_click_point, width=8).grid(row=0, column=0, padx=(0, 3))
+        ttk.Button(action_frame, text="Clear", 
+                  command=self.clear_all_points, width=8).grid(row=0, column=1)
         
-        self.points_listbox.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        # Compact points list
+        self.points_listbox = tk.Listbox(points_frame, height=4, font=('Consolas', 9),
+                                       selectmode=tk.SINGLE, activestyle='dotbox')
+        self.points_listbox.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 5))
         
-        # Remove point button
-        ttk.Button(points_frame, text="Remove Selected", 
-                  command=self.remove_click_point).grid(row=2, column=0, pady=5)
-        
-        # Clear all points button
-        ttk.Button(points_frame, text="Clear All", 
-                  command=self.clear_all_points).grid(row=2, column=1, pady=5)
+        # Points counter
+        self.points_counter = ttk.Label(points_frame, text="No points added", 
+                                      font=('Segoe UI', 8), foreground=self.colors['secondary'])
+        self.points_counter.grid(row=2, column=0, sticky=tk.W)
     
-    def create_click_settings_section(self, parent, row):
-        """Create the click settings section"""
-        settings_frame = ttk.LabelFrame(parent, text="Click Settings", padding="10")
-        settings_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+    def create_settings_and_schedule_section(self, parent, row):
+        """Create combined settings and schedule section"""
+        # Main container with two columns
+        main_container = ttk.Frame(parent)
+        main_container.grid(row=row, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        main_container.columnconfigure(0, weight=1)
+        main_container.columnconfigure(1, weight=1)
         
-        # Click mode selection
-        ttk.Label(settings_frame, text="Click Mode:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        # Left column - Click Settings
+        settings_frame = ttk.LabelFrame(main_container, text="⚙️ Settings", padding="8", style="Section.TLabelframe")
+        settings_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 5))
+        
+        # Click mode - compact radio buttons
+        mode_frame = ttk.Frame(settings_frame)
+        mode_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 8))
         
         self.click_mode = tk.StringVar(value="unlimited")
-        ttk.Radiobutton(settings_frame, text="Unlimited clicks", 
-                       variable=self.click_mode, value="unlimited").grid(row=0, column=1, sticky=tk.W)
-        ttk.Radiobutton(settings_frame, text="Set number of clicks", 
-                       variable=self.click_mode, value="limited").grid(row=0, column=2, sticky=tk.W)
+        ttk.Radiobutton(mode_frame, text="Unlimited", 
+                       variable=self.click_mode, value="unlimited").grid(row=0, column=0, sticky=tk.W)
+        ttk.Radiobutton(mode_frame, text="Limited", 
+                       variable=self.click_mode, value="limited").grid(row=0, column=1, sticky=tk.W, padx=(15, 0))
         
-        # Number of clicks
-        ttk.Label(settings_frame, text="Number of clicks:").grid(row=1, column=0, sticky=tk.W, pady=5)
-        self.click_count_var = tk.StringVar(value="1")
-        self.click_count_entry = ttk.Entry(settings_frame, textvariable=self.click_count_var, width=10)
-        self.click_count_entry.grid(row=1, column=1, sticky=tk.W, pady=5)
+        # Settings grid - compact
+        ttk.Label(settings_frame, text="Count:", font=('Segoe UI', 8)).grid(row=1, column=0, sticky=tk.W, pady=2)
+        self.click_count_var = tk.StringVar(value="10")
+        ttk.Entry(settings_frame, textvariable=self.click_count_var, width=8, font=('Segoe UI', 8)).grid(row=1, column=1, sticky=tk.W, padx=(5, 0), pady=2)
         
-        # Click interval
-        ttk.Label(settings_frame, text="Interval between clicks (seconds):").grid(row=2, column=0, sticky=tk.W, pady=5)
+        ttk.Label(settings_frame, text="Interval (s):", font=('Segoe UI', 8)).grid(row=2, column=0, sticky=tk.W, pady=2)
         self.interval_var = tk.StringVar(value="1.0")
-        ttk.Entry(settings_frame, textvariable=self.interval_var, width=10).grid(row=2, column=1, sticky=tk.W, pady=5)
+        ttk.Entry(settings_frame, textvariable=self.interval_var, width=8, font=('Segoe UI', 8)).grid(row=2, column=1, sticky=tk.W, padx=(5, 0), pady=2)
         
-        # Delay between points
-        ttk.Label(settings_frame, text="Delay between points (seconds):").grid(row=3, column=0, sticky=tk.W, pady=5)
+        ttk.Label(settings_frame, text="Point delay (s):", font=('Segoe UI', 8)).grid(row=3, column=0, sticky=tk.W, pady=2)
         self.point_delay_var = tk.StringVar(value="0.1")
-        ttk.Entry(settings_frame, textvariable=self.point_delay_var, width=10).grid(row=3, column=1, sticky=tk.W, pady=5)
-    
-    def create_schedule_section(self, parent, row):
-        """Create the schedule section"""
-        schedule_frame = ttk.LabelFrame(parent, text="Schedule Settings", padding="10")
-        schedule_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        ttk.Entry(settings_frame, textvariable=self.point_delay_var, width=8, font=('Segoe UI', 8)).grid(row=3, column=1, sticky=tk.W, padx=(5, 0), pady=2)
         
-        # Immediate or scheduled
+        # Right column - Schedule
+        schedule_frame = ttk.LabelFrame(main_container, text="⏰ Schedule", padding="8", style="Section.TLabelframe")
+        schedule_frame.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(5, 0))
+        
+        # Schedule mode
         self.schedule_mode = tk.StringVar(value="immediate")
-        ttk.Radiobutton(schedule_frame, text="Start immediately", 
-                       variable=self.schedule_mode, value="immediate").grid(row=0, column=0, sticky=tk.W)
-        ttk.Radiobutton(schedule_frame, text="Schedule for specific time", 
-                       variable=self.schedule_mode, value="scheduled").grid(row=0, column=1, sticky=tk.W)
+        ttk.Radiobutton(schedule_frame, text="Start now", 
+                       variable=self.schedule_mode, value="immediate").grid(row=0, column=0, sticky=tk.W, pady=(0, 5))
+        ttk.Radiobutton(schedule_frame, text="Schedule", 
+                       variable=self.schedule_mode, value="scheduled").grid(row=1, column=0, sticky=tk.W, pady=(0, 8))
         
-        # Time selection
+        # Time selection - compact
         time_frame = ttk.Frame(schedule_frame)
-        time_frame.grid(row=1, column=0, columnspan=2, pady=10)
+        time_frame.grid(row=2, column=0, sticky=(tk.W, tk.E))
         
-        ttk.Label(time_frame, text="Time (HH:MM):").grid(row=0, column=0, padx=5)
+        ttk.Label(time_frame, text="Time:", font=('Segoe UI', 8)).grid(row=0, column=0, sticky=tk.W)
         
         self.hour_var = tk.StringVar(value="20")
         self.minute_var = tk.StringVar(value="00")
         
-        hour_spinbox = ttk.Spinbox(time_frame, from_=0, to=23, width=5, 
-                                  textvariable=self.hour_var, format="%02.0f")
-        hour_spinbox.grid(row=0, column=1, padx=2)
+        hour_spinbox = ttk.Spinbox(time_frame, from_=0, to=23, width=4, 
+                                  textvariable=self.hour_var, format="%02.0f", font=('Segoe UI', 8))
+        hour_spinbox.grid(row=0, column=1, padx=(5, 2))
         
-        ttk.Label(time_frame, text=":").grid(row=0, column=2)
+        ttk.Label(time_frame, text=":", font=('Segoe UI', 8)).grid(row=0, column=2)
         
-        minute_spinbox = ttk.Spinbox(time_frame, from_=0, to=59, width=5, 
-                                    textvariable=self.minute_var, format="%02.0f")
-        minute_spinbox.grid(row=0, column=3, padx=2)
-        
-        # Current time display
-        self.current_time_label = ttk.Label(time_frame, text="")
-        self.current_time_label.grid(row=0, column=4, padx=20)
-        self.update_current_time()
+        minute_spinbox = ttk.Spinbox(time_frame, from_=0, to=59, width=4, 
+                                    textvariable=self.minute_var, format="%02.0f", font=('Segoe UI', 8))
+        minute_spinbox.grid(row=0, column=3, padx=(2, 0))
     
-    def create_control_buttons_section(self, parent, row):
-        """Create the control buttons section"""
-        control_frame = ttk.Frame(parent)
-        control_frame.grid(row=row, column=0, columnspan=2, pady=20)
+    def create_control_section(self, parent, row):
+        """Create compact control section"""
+        control_frame = ttk.LabelFrame(parent, text="🎮 Controls", padding="8", style="Section.TLabelframe")
+        control_frame.grid(row=row, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        control_frame.columnconfigure(0, weight=1)
         
-        self.start_button = ttk.Button(control_frame, text="Start Clicking", 
-                                      command=self.start_clicking, style="Accent.TButton")
-        self.start_button.grid(row=0, column=0, padx=10)
+        # Main controls
+        button_frame = ttk.Frame(control_frame)
+        button_frame.grid(row=0, column=0, pady=(0, 8))
         
-        self.stop_button = ttk.Button(control_frame, text="Stop", 
-                                     command=self.stop_clicking, state="disabled")
-        self.stop_button.grid(row=0, column=1, padx=10)
+        self.start_button = ttk.Button(button_frame, text="🚀 Start Clicking", 
+                                      command=self.start_clicking, style="Primary.TButton", width=15)
+        self.start_button.grid(row=0, column=0, padx=(0, 8))
         
-        # Status label
-        self.status_label = ttk.Label(control_frame, text="Ready", foreground="green")
-        self.status_label.grid(row=1, column=0, columnspan=2, pady=10)
-    
-    def create_settings_section(self, parent, row):
-        """Create the settings save/load section"""
-        settings_frame = ttk.LabelFrame(parent, text="Settings Management", padding="10")
-        settings_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        self.stop_button = ttk.Button(button_frame, text="⏹ Stop", 
+                                     command=self.stop_clicking, state="disabled", 
+                                     style="Danger.TButton", width=10)
+        self.stop_button.grid(row=0, column=1, padx=(0, 8))
         
-        ttk.Button(settings_frame, text="Save Settings", 
-                  command=self.save_settings).grid(row=0, column=0, padx=5)
-        ttk.Button(settings_frame, text="Load Settings", 
-                  command=self.load_settings).grid(row=0, column=1, padx=5)
-        ttk.Button(settings_frame, text="Reset Settings", 
-                  command=self.reset_settings).grid(row=0, column=2, padx=5)
+        # Settings management
+        settings_button_frame = ttk.Frame(control_frame)
+        settings_button_frame.grid(row=1, column=0)
+        
+        ttk.Button(settings_button_frame, text="💾", 
+                  command=self.save_settings, width=4).grid(row=0, column=0, padx=(0, 3))
+        ttk.Button(settings_button_frame, text="📂", 
+                  command=self.load_settings, width=4).grid(row=0, column=1, padx=(0, 3))
+        ttk.Button(settings_button_frame, text="🔄", 
+                  command=self.reset_settings, width=4).grid(row=0, column=2)
     
     def create_log_section(self, parent, row):
-        """Create the log display section"""
-        log_frame = ttk.LabelFrame(parent, text="Activity Log", padding="10")
-        log_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
+        """Create compact log section"""
+        log_frame = ttk.LabelFrame(parent, text="📋 Activity Log", padding="8", style="Section.TLabelframe")
+        log_frame.grid(row=row, column=0, sticky=(tk.W, tk.E), pady=(0, 5))
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(0, weight=1)
         
-        # Log text widget with scrollbar
+        # Log header with clear button
+        log_header = ttk.Frame(log_frame)
+        log_header.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 5))
+        log_header.columnconfigure(0, weight=1)
+        
+        self.log_status = ttk.Label(log_header, text="Ready to start...", 
+                                  font=('Segoe UI', 8), foreground=self.colors['secondary'])
+        self.log_status.grid(row=0, column=0, sticky=tk.W)
+        
+        ttk.Button(log_header, text="Clear", 
+                  command=self.clear_log, width=8).grid(row=0, column=1, sticky=tk.E)
+        
+        # Compact log text
         log_text_frame = ttk.Frame(log_frame)
-        log_text_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        log_text_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         log_text_frame.columnconfigure(0, weight=1)
         log_text_frame.rowconfigure(0, weight=1)
         
-        self.log_text = tk.Text(log_text_frame, height=8, wrap=tk.WORD)
+        self.log_text = tk.Text(log_text_frame, height=6, wrap=tk.WORD, 
+                               font=('Consolas', 8), bg='#f8fafc', relief='flat', bd=1)
         log_scrollbar = ttk.Scrollbar(log_text_frame, orient="vertical", command=self.log_text.yview)
         self.log_text.configure(yscrollcommand=log_scrollbar.set)
         
         self.log_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         log_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
-        
-        # Clear log button
-        ttk.Button(log_frame, text="Clear Log", 
-                  command=self.clear_log).grid(row=1, column=0, pady=5)
     
     def update_current_time(self):
         """Update the current time display"""
-        current_time = datetime.now().strftime("%H:%M:%S")
-        self.current_time_label.config(text=f"Current: {current_time}")
+        current_time = datetime.now().strftime("%H:%M:%S - %b %d")
+        self.current_time_label.config(text=current_time)
         self.root.after(1000, self.update_current_time)
     
     def add_click_point(self):
@@ -303,7 +374,16 @@ class AutoClickerApp:
         """Update the points listbox display"""
         self.points_listbox.delete(0, tk.END)
         for i, (x, y) in enumerate(self.click_points, 1):
-            self.points_listbox.insert(tk.END, f"{i}. ({x}, {y})")
+            self.points_listbox.insert(tk.END, f"{i:2d}. ({x:4d}, {y:4d})")
+        
+        # Update counter
+        count = len(self.click_points)
+        if count == 0:
+            self.points_counter.config(text="No points added")
+        elif count == 1:
+            self.points_counter.config(text="1 point added")
+        else:
+            self.points_counter.config(text=f"{count} points added")
     
     def start_clicking(self):
         """Start the clicking process"""
@@ -333,7 +413,7 @@ class AutoClickerApp:
         self.stop_button.config(state="normal")
         
         if self.schedule_mode.get() == "immediate":
-            self.status_label.config(text="Running...", foreground="blue")
+            self.update_status("Running...", "primary")
             self.click_thread = threading.Thread(target=self.click_worker)
             self.click_thread.daemon = True
             self.click_thread.start()
@@ -351,8 +431,7 @@ class AutoClickerApp:
                     scheduled_time += timedelta(days=1)
                 
                 self.scheduled_time = scheduled_time
-                self.status_label.config(text=f"Scheduled for {scheduled_time.strftime('%H:%M:%S')}", 
-                                       foreground="orange")
+                self.update_status(f"Scheduled for {scheduled_time.strftime('%H:%M')}", "warning")
                 
                 self.click_thread = threading.Thread(target=self.scheduled_click_worker)
                 self.click_thread.daemon = True
@@ -371,15 +450,29 @@ class AutoClickerApp:
         self.is_running = False
         self.start_button.config(state="normal")
         self.stop_button.config(state="disabled")
-        self.status_label.config(text="Stopped", foreground="red")
+        self.update_status("Stopped", "danger")
         self.log_message("Clicking stopped by user")
+    
+    def update_status(self, message, status_type="success"):
+        """Update status indicator and message"""
+        color_map = {
+            "success": self.colors['success'],
+            "warning": self.colors['warning'], 
+            "danger": self.colors['danger'],
+            "primary": self.colors['primary']
+        }
+        
+        color = color_map.get(status_type, self.colors['success'])
+        self.status_label.config(text=message, foreground=color)
+        self.status_indicator.config(fg=color)
+        self.log_status.config(text=message)
     
     def scheduled_click_worker(self):
         """Worker thread for scheduled clicking"""
         while self.is_running and self.scheduled_time:
             current_time = datetime.now()
             if current_time >= self.scheduled_time:
-                self.status_label.config(text="Running...", foreground="blue")
+                self.update_status("Running...", "primary")
                 self.log_message(f"Scheduled clicking started at {current_time.strftime('%H:%M:%S')}")
                 self.show_notification("Auto Clicker Started", "Scheduled clicking has begun!")
                 self.click_worker()
@@ -444,7 +537,7 @@ class AutoClickerApp:
         self.is_running = False
         self.start_button.config(state="normal")
         self.stop_button.config(state="disabled")
-        self.status_label.config(text=f"Completed - {total_clicks} clicks", foreground="green")
+        self.update_status(f"Completed - {total_clicks} clicks", "success")
         self.log_message(f"Clicking completed. Total clicks performed: {total_clicks}")
         self.show_notification("Auto Clicker Completed", f"Finished with {total_clicks} total clicks")
     
@@ -552,13 +645,13 @@ def main():
     
     root.protocol("WM_DELETE_WINDOW", on_closing)
     
-    # Center the window
+    # Center the window and set modern appearance
     root.update_idletasks()
-    width = root.winfo_width()
-    height = root.winfo_height()
+    width, height = 500, 700
     x = (root.winfo_screenwidth() // 2) - (width // 2)
     y = (root.winfo_screenheight() // 2) - (height // 2)
     root.geometry(f"{width}x{height}+{x}+{y}")
+    root.minsize(450, 600)
     
     root.mainloop()
 
